@@ -8,8 +8,20 @@ fn sample_schema() -> TableSchema {
         schema: "public".into(),
         name: "product".into(),
         columns: vec![
-            Column { name: "id".into(), data_type: "integer".into(), nullable: false, ordinal: 1, is_primary_key: true },
-            Column { name: "price".into(), data_type: "numeric".into(), nullable: true, ordinal: 2, is_primary_key: false },
+            Column {
+                name: "id".into(),
+                data_type: "integer".into(),
+                nullable: false,
+                ordinal: 1,
+                is_primary_key: true,
+            },
+            Column {
+                name: "price".into(),
+                data_type: "numeric".into(),
+                nullable: true,
+                ordinal: 2,
+                is_primary_key: false,
+            },
         ],
         primary_key: vec!["id".into()],
     }
@@ -21,27 +33,54 @@ fn table_hash_is_order_independent() {
     let r1 = make_record(&s, json!({"id": 1, "price": "9.99"}));
     let r2 = make_record(&s, json!({"id": 2, "price": "19.99"}));
 
-    let a = TableSnapshot { schema: s.clone(), rows: vec![r1.clone(), r2.clone()] };
-    let b = TableSnapshot { schema: s.clone(), rows: vec![r2, r1] };
+    let a = TableSnapshot {
+        schema: s.clone(),
+        rows: vec![r1.clone(), r2.clone()],
+    };
+    let b = TableSnapshot {
+        schema: s.clone(),
+        rows: vec![r2, r1],
+    };
     assert_eq!(a.table_hash(), b.table_hash());
 }
 
 #[test]
 fn table_hash_changes_with_data() {
     let s = sample_schema();
-    let a = TableSnapshot { schema: s.clone(), rows: vec![make_record(&s, json!({"id": 1, "price": "9.99"}))] };
-    let b = TableSnapshot { schema: s.clone(), rows: vec![make_record(&s, json!({"id": 1, "price": "8.99"}))] };
+    let a = TableSnapshot {
+        schema: s.clone(),
+        rows: vec![make_record(&s, json!({"id": 1, "price": "9.99"}))],
+    };
+    let b = TableSnapshot {
+        schema: s.clone(),
+        rows: vec![make_record(&s, json!({"id": 1, "price": "8.99"}))],
+    };
     assert_ne!(a.table_hash(), b.table_hash());
 }
 
 #[test]
 fn commit_chain_is_tamper_evident() {
     let s = sample_schema();
-    let snap = TableSnapshot { schema: s.clone(), rows: vec![make_record(&s, json!({"id": 1, "price": "9.99"}))] };
+    let snap = TableSnapshot {
+        schema: s.clone(),
+        rows: vec![make_record(&s, json!({"id": 1, "price": "9.99"}))],
+    };
     let tree = Tree::from_snapshots(&[snap]);
 
-    let root = Commit { tree: tree.hash(), parent: None, message: "init".into(), timestamp: 100, author: "t".into() };
-    let child = Commit { tree: tree.hash(), parent: Some(root.hash()), message: "next".into(), timestamp: 200, author: "t".into() };
+    let root = Commit {
+        tree: tree.hash(),
+        parent: None,
+        message: "init".into(),
+        timestamp: 100,
+        author: "t".into(),
+    };
+    let child = Commit {
+        tree: tree.hash(),
+        parent: Some(root.hash()),
+        message: "next".into(),
+        timestamp: 200,
+        author: "t".into(),
+    };
 
     // Tampering with the root's message changes its hash, breaking the link.
     let mut tampered = root.clone();

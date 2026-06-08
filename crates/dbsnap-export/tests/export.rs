@@ -9,8 +9,20 @@ fn snap() -> TableSnapshot {
         schema: "public".into(),
         name: "product".into(),
         columns: vec![
-            Column { name: "id".into(), data_type: "integer".into(), nullable: false, ordinal: 1, is_primary_key: true },
-            Column { name: "name".into(), data_type: "text".into(), nullable: true, ordinal: 2, is_primary_key: false },
+            Column {
+                name: "id".into(),
+                data_type: "integer".into(),
+                nullable: false,
+                ordinal: 1,
+                is_primary_key: true,
+            },
+            Column {
+                name: "name".into(),
+                data_type: "text".into(),
+                nullable: true,
+                ordinal: 2,
+                is_primary_key: false,
+            },
         ],
         primary_key: vec!["id".into()],
     };

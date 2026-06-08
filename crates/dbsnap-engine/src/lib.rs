@@ -58,12 +58,16 @@ impl Repository {
 
     /// Create a new repository under `parent/.dbsnap`.
     pub fn init(parent: &Path, config: Config) -> Result<Self> {
-        Ok(Self { store: Store::init(parent, config)? })
+        Ok(Self {
+            store: Store::init(parent, config)?,
+        })
     }
 
     /// Open the repository containing `start` (walks up to find `.dbsnap`).
     pub fn discover(start: &Path) -> Result<Self> {
-        Ok(Self { store: Store::discover(start)? })
+        Ok(Self {
+            store: Store::discover(start)?,
+        })
     }
 
     /// The persistent configuration (schema, optional connection string).
@@ -101,7 +105,13 @@ impl Repository {
             }
         }
 
-        let commit = Commit { tree: tree_hash, parent, message, timestamp: now_secs(), author };
+        let commit = Commit {
+            tree: tree_hash,
+            parent,
+            message,
+            timestamp: now_secs(),
+            author,
+        };
         let hash = self.store.write_commit(&commit)?;
         self.store.set_head(&hash)?;
 
@@ -131,7 +141,11 @@ impl Repository {
 
     pub fn status(&self) -> Result<Status> {
         match self.store.head()? {
-            None => Ok(Status { head: None, tables: 0, rows: 0 }),
+            None => Ok(Status {
+                head: None,
+                tables: 0,
+                rows: 0,
+            }),
             Some(hash) => {
                 let commit = self.store.read_commit(&hash)?;
                 let tree = self.store.read_tree(&commit.tree)?;
@@ -172,7 +186,10 @@ impl Repository {
     /// Diff the live database against HEAD — i.e. uncommitted / out-of-band
     /// changes. Errors if there is no HEAD to compare against.
     pub async fn live_diff<S: SnapshotSource>(&self, source: &S) -> Result<SnapshotDiff> {
-        let head = self.store.head()?.context("no HEAD to compare the database against")?;
+        let head = self
+            .store
+            .head()?
+            .context("no HEAD to compare the database against")?;
         let recorded = self.snapshots_of_commit(&head)?;
         let live = source.capture(&self.store.config.schema).await?;
         Ok(diff_snapshots(&recorded, &live))

@@ -15,7 +15,9 @@ struct FakeSource {
 
 impl FakeSource {
     fn new(states: Vec<Vec<TableSnapshot>>) -> Self {
-        FakeSource { states: RefCell::new(states.into()) }
+        FakeSource {
+            states: RefCell::new(states.into()),
+        }
     }
 }
 
@@ -36,8 +38,20 @@ fn schema() -> TableSchema {
         schema: "public".into(),
         name: "product".into(),
         columns: vec![
-            Column { name: "id".into(), data_type: "integer".into(), nullable: false, ordinal: 1, is_primary_key: true },
-            Column { name: "price".into(), data_type: "numeric".into(), nullable: true, ordinal: 2, is_primary_key: false },
+            Column {
+                name: "id".into(),
+                data_type: "integer".into(),
+                nullable: false,
+                ordinal: 1,
+                is_primary_key: true,
+            },
+            Column {
+                name: "price".into(),
+                data_type: "numeric".into(),
+                nullable: true,
+                ordinal: 2,
+                is_primary_key: false,
+            },
         ],
         primary_key: vec!["id".into()],
     }
@@ -45,7 +59,10 @@ fn schema() -> TableSchema {
 
 fn state(rows: Vec<Value>) -> Vec<TableSnapshot> {
     let s = schema();
-    vec![TableSnapshot { schema: s.clone(), rows: rows.into_iter().map(|r| make_record(&s, r)).collect() }]
+    vec![TableSnapshot {
+        schema: s.clone(),
+        rows: rows.into_iter().map(|r| make_record(&s, r)).collect(),
+    }]
 }
 
 #[tokio::test]
@@ -55,19 +72,31 @@ async fn full_workflow() {
 
     let source = FakeSource::new(vec![
         state(vec![json!({"id": 1, "price": "9.99"})]),
-        state(vec![json!({"id": 1, "price": "8.99"}), json!({"id": 2, "price": "1.00"})]),
+        state(vec![
+            json!({"id": 1, "price": "8.99"}),
+            json!({"id": 2, "price": "1.00"}),
+        ]),
     ]);
 
     // First commit: root.
-    let first = repo.commit(&source, "init".into(), "test".into()).await.unwrap();
+    let first = repo
+        .commit(&source, "init".into(), "test".into())
+        .await
+        .unwrap();
     assert!(matches!(first, CommitOutcome::Created { rows: 1, .. }));
 
     // Second commit: price change + insert.
-    let second = repo.commit(&source, "update".into(), "test".into()).await.unwrap();
+    let second = repo
+        .commit(&source, "update".into(), "test".into())
+        .await
+        .unwrap();
     assert!(matches!(second, CommitOutcome::Created { rows: 2, .. }));
 
     // Third capture sees the same (last) state => no-op commit.
-    let third = repo.commit(&source, "noop".into(), "test".into()).await.unwrap();
+    let third = repo
+        .commit(&source, "noop".into(), "test".into())
+        .await
+        .unwrap();
     assert!(matches!(third, CommitOutcome::Unchanged { .. }));
 
     // History has exactly two commits.

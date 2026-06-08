@@ -19,7 +19,10 @@ pub struct Violation {
 
 impl Violation {
     fn new(kind: &str, detail: impl Into<String>) -> Self {
-        Violation { kind: kind.to_string(), detail: detail.into() }
+        Violation {
+            kind: kind.to_string(),
+            detail: detail.into(),
+        }
     }
 }
 
@@ -58,7 +61,11 @@ pub fn verify_chain(store: &Store) -> Result<VerifyReport> {
         if recomputed != *stored_hash {
             report.violations.push(Violation::new(
                 "commit-hash-mismatch",
-                format!("commit {} content hashes to {}", stored_hash.short(), recomputed.short()),
+                format!(
+                    "commit {} content hashes to {}",
+                    stored_hash.short(),
+                    recomputed.short()
+                ),
             ));
         }
 
@@ -67,7 +74,11 @@ pub fn verify_chain(store: &Store) -> Result<VerifyReport> {
             if *stored_hash != parent {
                 report.violations.push(Violation::new(
                     "broken-chain",
-                    format!("expected parent {} but found {}", parent.short(), stored_hash.short()),
+                    format!(
+                        "expected parent {} but found {}",
+                        parent.short(),
+                        stored_hash.short()
+                    ),
                 ));
             }
         }
@@ -78,7 +89,11 @@ pub fn verify_chain(store: &Store) -> Result<VerifyReport> {
         if tree.hash() != commit.tree {
             report.violations.push(Violation::new(
                 "tree-hash-mismatch",
-                format!("tree {} in commit {} is altered", commit.tree.short(), stored_hash.short()),
+                format!(
+                    "tree {} in commit {} is altered",
+                    commit.tree.short(),
+                    stored_hash.short()
+                ),
             ));
         }
 

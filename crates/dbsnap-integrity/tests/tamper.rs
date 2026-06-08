@@ -14,8 +14,20 @@ fn schema() -> TableSchema {
         schema: "public".into(),
         name: "customer".into(),
         columns: vec![
-            Column { name: "id".into(), data_type: "integer".into(), nullable: false, ordinal: 1, is_primary_key: true },
-            Column { name: "email".into(), data_type: "text".into(), nullable: false, ordinal: 2, is_primary_key: false },
+            Column {
+                name: "id".into(),
+                data_type: "integer".into(),
+                nullable: false,
+                ordinal: 1,
+                is_primary_key: true,
+            },
+            Column {
+                name: "email".into(),
+                data_type: "text".into(),
+                nullable: false,
+                ordinal: 2,
+                is_primary_key: false,
+            },
         ],
         primary_key: vec!["id".into()],
     }
@@ -35,7 +47,13 @@ fn build_repo() -> (tempfile::TempDir, Store, std::path::PathBuf) {
     let table_hash = store.write_table_snapshot(&snap).unwrap();
     let tree = Tree::from_snapshots(&[snap]);
     let tree_hash = store.write_tree(&tree).unwrap();
-    let commit = Commit { tree: tree_hash, parent: None, message: "seed".into(), timestamp: 1, author: "t".into() };
+    let commit = Commit {
+        tree: tree_hash,
+        parent: None,
+        message: "seed".into(),
+        timestamp: 1,
+        author: "t".into(),
+    };
     let head = store.write_commit(&commit).unwrap();
     store.set_head(&head).unwrap();
 

@@ -9,8 +9,20 @@ fn schema() -> TableSchema {
         schema: "public".into(),
         name: "product".into(),
         columns: vec![
-            Column { name: "id".into(), data_type: "integer".into(), nullable: false, ordinal: 1, is_primary_key: true },
-            Column { name: "price".into(), data_type: "numeric".into(), nullable: true, ordinal: 2, is_primary_key: false },
+            Column {
+                name: "id".into(),
+                data_type: "integer".into(),
+                nullable: false,
+                ordinal: 1,
+                is_primary_key: true,
+            },
+            Column {
+                name: "price".into(),
+                data_type: "numeric".into(),
+                nullable: true,
+                ordinal: 2,
+                is_primary_key: false,
+            },
         ],
         primary_key: vec!["id".into()],
     }
@@ -18,13 +30,22 @@ fn schema() -> TableSchema {
 
 fn snap(rows: Vec<serde_json::Value>) -> TableSnapshot {
     let s = schema();
-    TableSnapshot { schema: s.clone(), rows: rows.into_iter().map(|r| make_record(&s, r)).collect() }
+    TableSnapshot {
+        schema: s.clone(),
+        rows: rows.into_iter().map(|r| make_record(&s, r)).collect(),
+    }
 }
 
 #[test]
 fn detects_insert_update_delete() {
-    let old = snap(vec![json!({"id": 1, "price": "9.99"}), json!({"id": 2, "price": "5.00"})]);
-    let new = snap(vec![json!({"id": 1, "price": "8.99"}), json!({"id": 3, "price": "1.00"})]);
+    let old = snap(vec![
+        json!({"id": 1, "price": "9.99"}),
+        json!({"id": 2, "price": "5.00"}),
+    ]);
+    let new = snap(vec![
+        json!({"id": 1, "price": "8.99"}),
+        json!({"id": 3, "price": "1.00"}),
+    ]);
 
     let d = diff_tables(&old, &new);
     assert_eq!(d.inserted.len(), 1, "id 3 inserted");

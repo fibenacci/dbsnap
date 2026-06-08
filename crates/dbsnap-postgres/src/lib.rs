@@ -41,7 +41,10 @@ impl PgSource {
         .await
         .context("listing tables")?;
 
-        Ok(rows.iter().map(|r| r.get::<String, _>("table_name")).collect())
+        Ok(rows
+            .iter()
+            .map(|r| r.get::<String, _>("table_name"))
+            .collect())
     }
 
     /// Introspect a table's columns and primary key.
@@ -71,8 +74,10 @@ impl PgSource {
         .await
         .with_context(|| format!("introspecting primary key of {schema}.{table}"))?;
 
-        let primary_key: Vec<String> =
-            pk_rows.iter().map(|r| r.get::<String, _>("column_name")).collect();
+        let primary_key: Vec<String> = pk_rows
+            .iter()
+            .map(|r| r.get::<String, _>("column_name"))
+            .collect();
         let pk_set: HashSet<&str> = primary_key.iter().map(|s| s.as_str()).collect();
 
         let columns = cols

@@ -1,0 +1,286 @@
+name: dbsnap CI
+
+on:
+    pull_request:
+    push:
+        branches:
+            - main
+        tags:
+            - 'v*'
+    workflow_dispatch:
+
+concurrency:
+    group: dbsnap-ci-${{ github.ref }}
+    cancel-in-progress: true
+
+# Least privilege for the GITHUB_TOKEN — read-only by default. Jobs that need
+# more (codeql: security-events, publish-results: checks + PR, release:
+# contents) declare their own block.
+permissions:
+    contents: read
+
+env:
+    CARGO_TERM_COLOR: always
+    RUST_BACKTRACE: '1'
+    MSRV: '1.82.0'
+
+jobs:
+    # ----- quality (→ quality-gate) --------------------------------------
+    # Steps reuse the Makefile so the exact commands live in one place and can
+    # be reproduced locally with `make <target>`.
+    quality:
+        name: Static Quality
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        steps:
+            -   uses: actions/checkout@v4
+            -   uses: dtolnay/rust-toolchain@stable
+                with:
+                    components: rustfmt
+            -   uses: Swatinem/rust-cache@v2
+            -   name: Formatting
+                run: make fmt-check
+            -   name: Docs (warnings as errors)
+                run: make doc
+
+    clippy:
+        name: Clippy Lint
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        steps:
+            -   uses: actions/checkout@v4
+            -   uses: dtolnay/rust-toolchain@stable
+                with:
+                    components: clippy
+            -   uses: Swatinem/rust-cache@v2
+            -   name: Clippy (deny warnings)
+                run: make clippy
+
+    build-check:
+        name: Build Check (MSRV)
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        steps:
+            -   uses: actions/checkout@v4
+            -   uses: dtolnay/rust-toolchain@master
+                with:
+                    toolchain: ${{ env.MSRV }}
+            -   uses: Swatinem/rust-cache@v2
+            -   name: Type-check on the minimum supported Rust version
+                run: make check
+
+    typos:
+        name: Typo Scan
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            -   uses: actions/checkout@v4
+            -   uses: crate-ci/typos@master
+
+    # ----- security (→ security-gate) ------------------------------------
+    # cargo-deny replaces a separate `cargo audit` job: it uses the same RustSec
+    # advisory DB AND analyzes the real build graph, so optional/never-compiled
+    # crates aren't falsely flagged. It also covers licenses, bans and sources.
+    cargo-deny:
+        name: Cargo Deny
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+            -   uses: actions/checkout@v4
+            -   uses: taiki-e/install-action@v2
+                with:
+                    tool: cargo-deny
+            -   name: Advisories, bans, licenses, sources
+                run: make deny
+
+    # CodeQL has GA support for Rust using build-mode "none" (no compilation
+    # needed). It adds semantic code analysis on top of the dependency checks.
+    codeql:
+        name: CodeQL
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        permissions:
+            security-events: write
+            actions: read
+            contents: read
+        steps:
+            -   uses: actions/checkout@v4
+            -   name: Initialize CodeQL
+                uses: github/codeql-action/init@v3
+                with:
+                    languages: rust
+                    build-mode: none
+            -   name: Perform CodeQL Analysis
+                uses: github/codeql-action/analyze@v3
+
+    # ----- gates ----------------------------------------------------------
+    security-gate:
+        name: Security Gate
+        needs: [cargo-deny, codeql]
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            -   run: echo "✅ cargo deny + CodeQL analysis passed."
+
+    quality-gate:
+        name: Quality Gate
+        needs: [quality, clippy, build-check, typos]
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            -   run: echo "✅ static quality + clippy + MSRV build + typo scan passed."
+
+    # ----- tests ----------------------------------------------------------
+    tests:
+        name: Test Suite
+        needs: [quality-gate, security-gate]
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        steps:
+            -   uses: actions/checkout@v4
+            -   uses: dtolnay/rust-toolchain@stable
+            -   uses: Swatinem/rust-cache@v2
+            -   uses: taiki-e/install-action@v2
+                with:
+                    tool: cargo-nextest
+            -   id: nextest
+                name: Run test suite (nextest, JUnit profile)
+                run: make test-junit
+            -   id: doctests
+                name: Run doctests
+                if: always()
+                run: make doctest
+            -   name: Upload JUnit results
+                if: always()
+                uses: actions/upload-artifact@v4
+                with:
+                    name: junit-results
+                    path: target/nextest/ci/junit.xml
+                    if-no-files-found: ignore
+            -   name: Gate — fail on any failed test suite
+                if: always()
+                run: |
+                    .github/scripts/gate.sh "One or more test suites failed — see the steps above and the published report." \
+                        "nextest=${{ steps.nextest.outcome }}" \
+                        "doctests=${{ steps.doctests.outcome }}"
+
+    publish-results:
+        name: Publish Test Results
+        needs: [tests, quality-gate, security-gate]
+        if: ${{ !cancelled() }}
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            checks: write
+            pull-requests: write
+        steps:
+            -   uses: actions/checkout@v4
+            -   name: Download JUnit results
+                continue-on-error: true
+                uses: actions/download-artifact@v4
+                with:
+                    name: junit-results
+                    path: junit-results
+            -   name: Publish test report
+                if: ${{ needs.tests.result == 'success' || needs.tests.result == 'failure' }}
+                uses: dorny/test-reporter@v1
+                with:
+                    name: Test Suite
+                    path: 'junit-results/junit.xml'
+                    reporter: java-junit
+                    list-tests: failed
+                    list-suites: all
+                    fail-on-error: false
+                    fail-on-empty: false
+
+    report-ci:
+        name: Report CI
+        needs: [quality-gate, security-gate, tests, publish-results]
+        if: always()
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: actions/checkout@v4
+            -   name: Check CI results
+                run: |
+                    if [ "${{ needs.publish-results.result }}" = "failure" ]; then
+                        echo "::warning::publish-results failed — the report may be missing."
+                    fi
+                    GATE_STRICT=1 .github/scripts/gate.sh \
+                        "One or more required CI jobs failed, were cancelled, or were skipped (upstream gate red)." \
+                        "quality-gate (fmt + clippy + MSRV + typos)=${{ needs.quality-gate.result }}" \
+                        "security-gate (deny + codeql)=${{ needs.security-gate.result }}" \
+                        "tests=${{ needs.tests.result }}"
+
+    # ----- build (→ binary artifacts) ------------------------------------
+    build:
+        name: Build (${{ matrix.target }})
+        needs: [report-ci]
+        runs-on: ${{ matrix.os }}
+        timeout-minutes: 30
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    -   os: ubuntu-latest
+                        target: x86_64-unknown-linux-gnu
+                    -   os: macos-latest
+                        target: aarch64-apple-darwin
+                    -   os: windows-latest
+                        target: x86_64-pc-windows-msvc
+        steps:
+            -   uses: actions/checkout@v4
+            -   uses: dtolnay/rust-toolchain@stable
+                with:
+                    targets: ${{ matrix.target }}
+            -   uses: Swatinem/rust-cache@v2
+                with:
+                    key: ${{ matrix.target }}
+            -   name: Build release binary
+                run: cargo build --release --locked -p dbsnap-cli --target ${{ matrix.target }}
+            -   name: Package binary
+                shell: bash
+                run: |
+                    bin=dbsnap
+                    dist="dbsnap-${{ matrix.target }}"
+                    mkdir -p "$dist"
+                    if [ "${{ matrix.os }}" = "windows-latest" ]; then
+                        cp "target/${{ matrix.target }}/release/${bin}.exe" "$dist/"
+                    else
+                        cp "target/${{ matrix.target }}/release/${bin}" "$dist/"
+                    fi
+                    cp README.md "$dist/"
+                    if [ "${{ matrix.os }}" = "windows-latest" ]; then
+                        7z a "${dist}.zip" "$dist" >/dev/null
+                        echo "ASSET=${dist}.zip" >> "$GITHUB_ENV"
+                    else
+                        tar -czf "${dist}.tar.gz" "$dist"
+                        echo "ASSET=${dist}.tar.gz" >> "$GITHUB_ENV"
+                    fi
+            -   name: Upload binary artifact
+                uses: actions/upload-artifact@v4
+                with:
+                    name: dbsnap-${{ matrix.target }}
+                    path: ${{ env.ASSET }}
+                    if-no-files-found: error
+
+    # ----- release (→ GitHub Release with binaries) ----------------------
+    release:
+        name: Release
+        needs: [build]
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            -   uses: actions/download-artifact@v4
+                with:
+                    path: dist
+            -   name: Publish GitHub Release
+                env:
+                    GH_TOKEN: ${{ github.token }}
+                run: |
+                    gh release create "${{ github.ref_name }}" \
+                        --repo "${{ github.repository }}" \
+                        --title "${{ github.ref_name }}" \
+                        --generate-notes \
+                        dist/*/dbsnap-*.tar.gz dist/*/dbsnap-*.zip

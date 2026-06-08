@@ -77,7 +77,10 @@ impl FromStr for DbHash {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() != 64 {
-            return Err(ParseHashError(format!("expected 64 hex chars, got {}", s.len())));
+            return Err(ParseHashError(format!(
+                "expected 64 hex chars, got {}",
+                s.len()
+            )));
         }
         let mut out = [0u8; 32];
         let bytes = s.as_bytes();

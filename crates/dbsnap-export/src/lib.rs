@@ -41,8 +41,16 @@ fn export_sql(snaps: &[&TableSnapshot]) -> String {
     let mut out = String::new();
     for s in snaps {
         let cols: Vec<&str> = s.schema.columns.iter().map(|c| c.name.as_str()).collect();
-        let col_list = cols.iter().map(|c| quote_ident(c)).collect::<Vec<_>>().join(", ");
-        out.push_str(&format!("-- {} ({} rows)\n", s.schema.qualified(), s.rows.len()));
+        let col_list = cols
+            .iter()
+            .map(|c| quote_ident(c))
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.push_str(&format!(
+            "-- {} ({} rows)\n",
+            s.schema.qualified(),
+            s.rows.len()
+        ));
 
         for row in &s.rows {
             let values: Vec<String> = cols
@@ -70,7 +78,13 @@ fn quote_ident(ident: &str) -> String {
 fn sql_literal(v: &Value) -> String {
     match v {
         Value::Null => "NULL".to_string(),
-        Value::Bool(b) => if *b { "TRUE".into() } else { "FALSE".into() },
+        Value::Bool(b) => {
+            if *b {
+                "TRUE".into()
+            } else {
+                "FALSE".into()
+            }
+        }
         Value::Number(n) => n.to_string(),
         Value::String(s) => quote_str(s),
         // Arrays/objects come from json/jsonb columns: emit as a jsonb literal.

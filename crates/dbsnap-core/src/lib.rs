@@ -14,10 +14,10 @@
 //! additionally folds in the parent commit, forming a tamper-evident chain.
 //!
 //! ## Module map
-//! - [`schema`]   — column / table structure ([`Column`], [`TableSchema`])
-//! - [`snapshot`] — captured rows ([`RowRecord`], [`TableSnapshot`])
-//! - [`commit`]   — the Merkle tree and commit objects ([`Tree`], [`Commit`])
-//! - [`source`]   — the [`SnapshotSource`] abstraction over a database
+//! - `schema`   — column / table structure ([`Column`], [`TableSchema`])
+//! - `snapshot` — captured rows ([`RowRecord`], [`TableSnapshot`])
+//! - `commit`   — the Merkle tree and commit objects ([`Tree`], [`Commit`])
+//! - `source`   — the [`SnapshotSource`] abstraction over a database
 
 mod commit;
 mod schema;

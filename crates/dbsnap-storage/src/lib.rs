@@ -36,7 +36,10 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Config { schema: "public".into(), database_url: None }
+        Config {
+            schema: "public".into(),
+            database_url: None,
+        }
     }
 }
 
@@ -65,7 +68,11 @@ impl Store {
 
     /// Open an existing repository given its `.dbsnap` dir or its parent.
     pub fn open(path: &Path) -> Result<Store> {
-        let root = if path.ends_with(DIR) { path.to_path_buf() } else { path.join(DIR) };
+        let root = if path.ends_with(DIR) {
+            path.to_path_buf()
+        } else {
+            path.join(DIR)
+        };
         let cfg_path = root.join("config.toml");
         let cfg: Config = toml::from_str(
             &fs::read_to_string(&cfg_path)
@@ -134,8 +141,8 @@ impl Store {
 
     pub fn read_commit(&self, hash: &DbHash) -> Result<Commit> {
         let path = self.root.join("commits").join(format!("{hash}.json"));
-        let bytes = fs::read(&path)
-            .with_context(|| format!("reading commit object {}", path.display()))?;
+        let bytes =
+            fs::read(&path).with_context(|| format!("reading commit object {}", path.display()))?;
         Ok(serde_json::from_slice(&bytes)?)
     }
 
@@ -183,7 +190,9 @@ impl Store {
             for step in 0..n {
                 let commit = self.read_commit(&cur)?;
                 cur = commit.parent.with_context(|| {
-                    format!("reference '{reference}' goes past the root commit (only {step} parents)")
+                    format!(
+                        "reference '{reference}' goes past the root commit (only {step} parents)"
+                    )
                 })?;
             }
             return Ok(cur);
@@ -215,7 +224,10 @@ impl Store {
         match matches.len() {
             0 => bail!("no commit matches '{prefix}'"),
             1 => Ok(DbHash::from_str(&matches[0])?),
-            _ => bail!("ambiguous reference '{prefix}' matches {} commits", matches.len()),
+            _ => bail!(
+                "ambiguous reference '{prefix}' matches {} commits",
+                matches.len()
+            ),
         }
     }
 

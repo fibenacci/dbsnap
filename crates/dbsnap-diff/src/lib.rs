@@ -63,7 +63,10 @@ pub fn diff_tables(old: &TableSnapshot, new: &TableSnapshot) -> TableDiff {
     let new_rows: BTreeMap<&str, &dbsnap_core::RowRecord> =
         new.rows.iter().map(|r| (r.pk.as_str(), r)).collect();
 
-    let mut diff = TableDiff { table, ..Default::default() };
+    let mut diff = TableDiff {
+        table,
+        ..Default::default()
+    };
 
     for (pk, nr) in &new_rows {
         match old_rows.get(pk) {
@@ -109,7 +112,11 @@ fn column_changes(old: &Value, new: &Value) -> Vec<ColumnChange> {
         let ov = old.get(k).cloned().unwrap_or(Value::Null);
         let nv = new.get(k).cloned().unwrap_or(Value::Null);
         if ov != nv {
-            changes.push(ColumnChange { column: k.clone(), old: ov, new: nv });
+            changes.push(ColumnChange {
+                column: k.clone(),
+                old: ov,
+                new: nv,
+            });
         }
     }
     changes

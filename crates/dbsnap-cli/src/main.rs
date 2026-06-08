@@ -27,15 +27,26 @@ async fn main() {
 
 async fn run() -> Result<()> {
     match Cli::parse().command {
-        Command::Init { database_url, schema } => commands::init::run(database_url, schema),
+        Command::Init {
+            database_url,
+            schema,
+        } => commands::init::run(database_url, schema),
         Command::Commit { message, author } => commands::commit::run(message, author).await,
         Command::Log { limit } => commands::log::run(limit),
         Command::Status => commands::status::run().await,
-        Command::Diff { old, new, verbose, json } => commands::diff::run(old, new, verbose, json),
+        Command::Diff {
+            old,
+            new,
+            verbose,
+            json,
+        } => commands::diff::run(old, new, verbose, json),
         Command::Verify { live, json } => commands::verify::run(live, json).await,
-        Command::Export { commit, format, table, output } => {
-            commands::export::run(commit, format, table, output)
-        }
+        Command::Export {
+            commit,
+            format,
+            table,
+            output,
+        } => commands::export::run(commit, format, table, output),
     }
 }
 

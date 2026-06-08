@@ -19,7 +19,12 @@ pub fn print_commit_outcome(outcome: &CommitOutcome, summary: &str) {
         CommitOutcome::Unchanged { head } => {
             println!("nothing to commit: database state matches {}", head.short());
         }
-        CommitOutcome::Created { commit, tree, tables, rows } => {
+        CommitOutcome::Created {
+            commit,
+            tree,
+            tables,
+            rows,
+        } => {
             println!("[{}] {summary}", commit.short());
             println!("  {tables} tables, {rows} rows, tree {}", tree.short());
         }
@@ -108,7 +113,10 @@ pub fn print_verify(report: &VerifyReport) {
     if report.ok() {
         println!("{GREEN}✓ Integrity verified — hash chain intact.{RESET}");
     } else {
-        println!("{RED}✗ {} integrity violation(s) detected:{RESET}", report.violations.len());
+        println!(
+            "{RED}✗ {} integrity violation(s) detected:{RESET}",
+            report.violations.len()
+        );
         for v in &report.violations {
             println!("  {RED}[{}]{RESET} {}", v.kind, v.detail);
         }
