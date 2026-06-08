@@ -1,0 +1,17 @@
+[package]
+name = "dbsnap-integrity"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+dbsnap-core.workspace = true
+dbsnap-hashing.workspace = true
+dbsnap-storage.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+zstd.workspace = true
+tempfile.workspace = true

@@ -1,0 +1,31 @@
+# Rust build artifacts
+/target
+**/*.rs.bk
+*.pdb
+
+# Cargo.lock IS committed: dbsnap ships a binary, so we want reproducible builds.
+
+# dbsnap repositories created while developing / testing
+/.dbsnap
+**/.dbsnap
+
+# Local environment / secrets (DATABASE_URL etc.)
+.env
+.env.*
+.envrc
+
+# Coverage / profiling output
+*.profraw
+/coverage
+lcov.info
+
+# IDE / editor
+.idea/
+.vscode/
+*.iml
+*.swp
+*~
+
+# OS cruft
+.DS_Store
+Thumbs.db

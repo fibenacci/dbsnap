@@ -1,0 +1,57 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/dbsnap-hashing",
+    "crates/dbsnap-core",
+    "crates/dbsnap-postgres",
+    "crates/dbsnap-storage",
+    "crates/dbsnap-diff",
+    "crates/dbsnap-integrity",
+    "crates/dbsnap-export",
+    "crates/dbsnap-engine",
+    "crates/dbsnap-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/dbsnap/dbsnap"
+rust-version = "1.82"
+
+[workspace.dependencies]
+anyhow = "1"
+thiserror = "1"
+serde = { version = "1", features = ["derive"] }
+# arbitrary_precision preserves numeric fidelity (large NUMERIC, etc.) so row
+# hashes stay deterministic and lossless. We do NOT enable preserve_order: the
+# default BTreeMap-backed Map keeps object keys sorted => canonical JSON bytes.
+serde_json = { version = "1", features = ["arbitrary_precision"] }
+toml = "0.8"
+blake3 = "1"
+zstd = "0.13"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+clap = { version = "4", features = ["derive", "env"] }
+sqlx = { version = "0.8", default-features = false, features = [
+    "postgres",
+    "runtime-tokio",
+    "tls-native-tls",
+    "json",
+] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# internal
+dbsnap-hashing = { path = "crates/dbsnap-hashing" }
+dbsnap-core = { path = "crates/dbsnap-core" }
+dbsnap-postgres = { path = "crates/dbsnap-postgres" }
+dbsnap-storage = { path = "crates/dbsnap-storage" }
+dbsnap-diff = { path = "crates/dbsnap-diff" }
+dbsnap-integrity = { path = "crates/dbsnap-integrity" }
+dbsnap-export = { path = "crates/dbsnap-export" }
+dbsnap-engine = { path = "crates/dbsnap-engine" }
+tempfile = "3"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
