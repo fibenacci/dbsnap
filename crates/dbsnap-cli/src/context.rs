@@ -1,9 +1,11 @@
-//! Wiring between the CLI and the engine: locate the repository and construct
-//! a concrete database source. This is the only place that names PostgreSQL.
+//! Wiring between the CLI and the engine: locate the repository and connect to
+//! the configured database. The concrete engine is chosen by the [`crate::source`]
+//! registry from the connection string's URL scheme.
 
 use anyhow::{Context, Result};
 use dbsnap_engine::Repository;
-use dbsnap_postgres::PgSource;
+
+use crate::source::AnySource;
 
 /// Open the repository containing the current working directory.
 pub fn open() -> Result<Repository> {
@@ -24,7 +26,8 @@ pub fn database_url(repo: &Repository) -> Result<String> {
         .context("no database connection string; set DATABASE_URL or store one via `dbsnap init`")
 }
 
-/// Connect to the configured database as a snapshot source.
-pub async fn connect(repo: &Repository) -> Result<PgSource> {
-    PgSource::connect(&database_url(repo)?).await
+/// Connect to the configured database as a snapshot source, selecting the
+/// engine by URL scheme (`postgres://`, and later `mysql://`, `sqlite://`).
+pub async fn connect(repo: &Repository) -> Result<AnySource> {
+    AnySource::connect(&database_url(repo)?).await
 }

@@ -10,6 +10,7 @@ mod commands;
 mod context;
 mod datetime;
 mod render;
+mod source;
 
 use anyhow::Result;
 use clap::Parser;

@@ -82,6 +82,21 @@ tables are stored once and shared across commits.
 | `dbsnap-export` | JSON / SQL export of historical state |
 | `dbsnap-cli` | `dbsnap` binary (clap + tokio) |
 
+## Database engines
+
+The engine is selected at runtime from the connection string's URL scheme
+(`postgres://`). The whole stack below the CLI is engine-agnostic: it depends
+only on the `SnapshotSource` trait (`dbsnap-core`), and the CLI's `source`
+registry is the single place that maps a scheme to a concrete backend. Adding
+MySQL or SQLite is therefore a drop-in — a new `dbsnap-<engine>` crate
+implementing `SnapshotSource`, plus one match arm in the registry. Unsupported
+schemes fail fast with a clear message.
+
+Note: deterministic hashes are *per engine* — the same logical data in
+PostgreSQL and MySQL hashes differently because engines render types
+differently. Cross-engine diffing would need a normalization layer and is out
+of scope for now.
+
 ## Known MVP limitations
 
 - Whole-table capture loads rows into memory (no streaming yet).
