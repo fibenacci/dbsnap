@@ -4,10 +4,19 @@
 [advisories]
 version = 2
 # Vulnerabilities fail the build (default). Yanked crates only warn so a
-# transient yank doesn't block CI. Nothing is ignored: cargo-deny analyzes the
-# real build graph, so optional/never-compiled crates are not flagged.
+# transient yank doesn't block CI.
 yanked = "warn"
-ignore = []
+ignore = [
+    # RSA "Marvin attack" timing side-channel, pulled in transitively by
+    # sqlx-mysql (mandatory `rsa` dependency for caching_sha2_password auth).
+    # Assessed as NOT exploitable in dbsnap: the advisory concerns RSA
+    # *private-key decryption* timing, but dbsnap holds no private key — it only
+    # uses the server's *public* key to encrypt its own password during non-TLS
+    # MySQL auth (and TLS avoids that path entirely). The decrypting party is the
+    # MySQL server, not this tool. No upstream fix exists. See README "Security
+    # note" and https://rustsec.org/advisories/RUSTSEC-2023-0071.
+    { id = "RUSTSEC-2023-0071", reason = "rsa private-key decryption path not reachable from dbsnap; client only does public-key encryption during MySQL auth" },
+]
 
 [licenses]
 version = 2

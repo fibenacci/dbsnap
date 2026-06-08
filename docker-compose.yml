@@ -1,6 +1,7 @@
-# Throwaway PostgreSQL for local development and the end-to-end test.
+# Throwaway databases for local development and end-to-end tests.
 #   docker compose up -d
-#   export DATABASE_URL=postgres://dbsnap:dbsnap@localhost:5433/dbsnap
+#   PostgreSQL: postgres://dbsnap:dbsnap@localhost:5433/dbsnap
+#   MySQL:      mysql://dbsnap:dbsnap@localhost:3307/dbsnap
 services:
   postgres:
     image: postgres:16-alpine
@@ -15,3 +16,18 @@ services:
       interval: 2s
       timeout: 3s
       retries: 20
+
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: dbsnap
+      MYSQL_PASSWORD: dbsnap
+      MYSQL_DATABASE: dbsnap
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-udbsnap", "-pdbsnap"]
+      interval: 3s
+      timeout: 3s
+      retries: 30

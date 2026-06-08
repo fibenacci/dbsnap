@@ -12,6 +12,7 @@ path = "src/main.rs"
 dbsnap-core.workspace = true
 dbsnap-engine.workspace = true
 dbsnap-postgres.workspace = true
+dbsnap-mysql.workspace = true
 dbsnap-diff.workspace = true
 dbsnap-integrity.workspace = true
 anyhow.workspace = true

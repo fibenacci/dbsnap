@@ -4,6 +4,7 @@ members = [
     "crates/dbsnap-hashing",
     "crates/dbsnap-core",
     "crates/dbsnap-postgres",
+    "crates/dbsnap-mysql",
     "crates/dbsnap-storage",
     "crates/dbsnap-diff",
     "crates/dbsnap-integrity",
@@ -45,6 +46,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dbsnap-hashing = { path = "crates/dbsnap-hashing" }
 dbsnap-core = { path = "crates/dbsnap-core" }
 dbsnap-postgres = { path = "crates/dbsnap-postgres" }
+dbsnap-mysql = { path = "crates/dbsnap-mysql" }
 dbsnap-storage = { path = "crates/dbsnap-storage" }
 dbsnap-diff = { path = "crates/dbsnap-diff" }
 dbsnap-integrity = { path = "crates/dbsnap-integrity" }

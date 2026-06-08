@@ -1,0 +1,12 @@
+[package]
+name = "dbsnap-mysql"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+dbsnap-core.workspace = true
+anyhow.workspace = true
+sqlx = { workspace = true, features = ["mysql"] }
+serde_json.workspace = true
+tracing.workspace = true

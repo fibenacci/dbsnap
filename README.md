@@ -9,9 +9,10 @@ and replayable.
 
 ## Status
 
-MVP — PostgreSQL only. Implements the full first-release scope:
-deterministic snapshots, commit manifests, row & table hashing, semantic diffs,
-integrity verification, and export.
+MVP — **PostgreSQL** and **MySQL / MariaDB**. Implements the full first-release
+scope: deterministic snapshots, commit manifests, row & table hashing, semantic
+diffs, integrity verification, and export. The engine is selected automatically
+from the connection string's URL scheme.
 
 ## Install / build
 
@@ -23,11 +24,14 @@ cargo build --release
 ## Quick start
 
 ```bash
-# 1. Spin up a throwaway Postgres (optional)
+# 1. Spin up a throwaway database (optional)
 docker compose up -d
 export DATABASE_URL=postgres://dbsnap:dbsnap@localhost:5433/dbsnap
+# ...or MySQL:
+# export DATABASE_URL=mysql://dbsnap:dbsnap@localhost:3307/dbsnap
 
 # 2. Initialize a repository (creates ./.dbsnap)
+#    For MySQL, set --schema to the database name (e.g. --schema dbsnap).
 dbsnap init
 
 # 3. Capture state
@@ -75,7 +79,8 @@ tables are stored once and shared across commits.
 |---|---|
 | `dbsnap-hashing` | BLAKE3, domain separation, canonical JSON hashing |
 | `dbsnap-core` | Domain model + the deterministic hash hierarchy |
-| `dbsnap-postgres` | Schema introspection & row capture via `to_jsonb` |
+| `dbsnap-postgres` | PostgreSQL introspection & row capture via `to_jsonb` |
+| `dbsnap-mysql` | MySQL / MariaDB introspection & row capture via `JSON_OBJECT` |
 | `dbsnap-storage` | Content-addressed filesystem store + ref resolution |
 | `dbsnap-diff` | Semantic diff engine (insert/update/delete + column changes) |
 | `dbsnap-integrity` | Hash-chain verification |
@@ -84,18 +89,42 @@ tables are stored once and shared across commits.
 
 ## Database engines
 
-The engine is selected at runtime from the connection string's URL scheme
-(`postgres://`). The whole stack below the CLI is engine-agnostic: it depends
-only on the `SnapshotSource` trait (`dbsnap-core`), and the CLI's `source`
-registry is the single place that maps a scheme to a concrete backend. Adding
-MySQL or SQLite is therefore a drop-in — a new `dbsnap-<engine>` crate
-implementing `SnapshotSource`, plus one match arm in the registry. Unsupported
-schemes fail fast with a clear message.
+| Scheme | Engine | Status |
+|---|---|---|
+| `postgres://` / `postgresql://` | PostgreSQL | supported |
+| `mysql://` / `mariadb://` | MySQL / MariaDB | supported |
+| `sqlite://` | SQLite | planned |
 
-Note: deterministic hashes are *per engine* — the same logical data in
-PostgreSQL and MySQL hashes differently because engines render types
-differently. Cross-engine diffing would need a normalization layer and is out
-of scope for now.
+The engine is selected at runtime from the connection string's URL scheme. The
+whole stack below the CLI is engine-agnostic: it depends only on the
+`SnapshotSource` trait (`dbsnap-core`), and the CLI's `source` registry is the
+single place that maps a scheme to a concrete backend. Adding an engine is a
+drop-in — a new `dbsnap-<engine>` crate implementing `SnapshotSource`, plus one
+match arm in the registry. Unsupported schemes fail fast with a clear message.
+
+Notes:
+
+- **Determinism is per engine.** The same logical data in PostgreSQL and MySQL
+  hashes differently because engines render types differently (e.g. a boolean
+  is `true`/`false` in Postgres but `1`/`0` in MySQL). Cross-engine diffing
+  would need a normalization layer and is out of scope for now.
+- **`export --format sql` emits PostgreSQL dialect** (double-quoted identifiers,
+  `::jsonb`). For MySQL, use `--format json` (engine-neutral) until a
+  dialect-aware SQL exporter lands.
+- **MySQL over TLS recommended.** dbsnap only ever uses the server's *public*
+  key to encrypt its own password during non-TLS `caching_sha2_password` auth;
+  connecting with `?ssl-mode=REQUIRED` avoids that path entirely. See the
+  security note below.
+
+### Security note (RUSTSEC-2023-0071)
+
+Enabling MySQL pulls in the `rsa` crate (via `sqlx-mysql`), which carries
+RUSTSEC-2023-0071 (the "Marvin attack" RSA timing side-channel). This advisory
+concerns **private-key decryption** timing. dbsnap holds no RSA private key and
+only performs **public-key encryption** of its own password during MySQL auth —
+the vulnerable code path is not reachable from dbsnap, and the decrypting party
+is the MySQL server, not this tool. There is no upstream fix; the issue is not
+exploitable in dbsnap's usage.
 
 ## Known MVP limitations
 
