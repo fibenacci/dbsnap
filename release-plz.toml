@@ -1,0 +1,34 @@
+# release-plz configuration — https://release-plz.dev/docs/config
+#
+# dbsnap is an application, not a library:
+#  - no crates.io publish,
+#  - release-plz only bumps the version, updates the changelog, and pushes the
+#    `v<version>` tag; cargo-dist (triggered by that tag) builds the binaries
+#    and creates the GitHub release.
+
+[workspace]
+publish = false              # do not `cargo publish` to crates.io
+git_release_enable = false   # cargo-dist creates the GitHub release on the tag
+git_tag_enable = true        # release-plz pushes the v<version> tag
+
+[changelog]
+# Conventional Commits + a leading emoji per type. The preprocessor strips the
+# leading emoji so the `^type` parsers still match; the changelog then groups
+# entries under emoji headings.
+commit_preprocessors = [
+    { pattern = '^[^\x00-\x7F]+\s*', replace = "" },
+]
+commit_parsers = [
+    { message = "^feat", group = "✨ Features" },
+    { message = "^fix", group = "🐛 Bug Fixes" },
+    { message = "^perf", group = "⚡ Performance" },
+    { message = "^refactor", group = "♻️ Refactoring" },
+    { message = "^docs", group = "📝 Documentation" },
+    { message = "^test", group = "✅ Testing" },
+    { message = "^build", group = "📦 Build" },
+    { message = "^ci", group = "👷 CI" },
+    { message = "^style", group = "🎨 Styling" },
+    { message = "^chore", group = "🔧 Chores" },
+    { message = "^revert", group = "⏪ Reverts" },
+    { message = ".*", group = "🔖 Other" },
+]

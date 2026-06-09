@@ -9,9 +9,11 @@ on:
             - 'v*'
     workflow_dispatch:
 
+# Cancel superseded PR runs, but never cancel a push to main mid-flight — the
+# release-plz job below must always run to completion.
 concurrency:
     group: dbsnap-ci-${{ github.ref }}
-    cancel-in-progress: true
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Least privilege for the GITHUB_TOKEN — read-only by default. Jobs that need
 # more (codeql: security-events, publish-results: checks + PR, release:
@@ -211,76 +213,31 @@ jobs:
                         "security-gate (deny + codeql)=${{ needs.security-gate.result }}" \
                         "tests=${{ needs.tests.result }}"
 
-    # ----- build (→ binary artifacts) ------------------------------------
-    build:
-        name: Build (${{ matrix.target }})
+    # ----- release automation --------------------------------------------
+    # Runs only on pushes to main, and only after CI is green (needs report-ci).
+    # Opens/updates the release PR (version bump + changelog); merging that PR
+    # pushes the v<version> tag. cargo-dist (release.yml) then builds the
+    # binaries and creates the GitHub release on that tag.
+    release-plz:
+        name: Release-plz
         needs: [report-ci]
-        runs-on: ${{ matrix.os }}
-        timeout-minutes: 30
-        strategy:
-            fail-fast: false
-            matrix:
-                include:
-                    -   os: ubuntu-latest
-                        target: x86_64-unknown-linux-gnu
-                    -   os: macos-latest
-                        target: aarch64-apple-darwin
-                    -   os: windows-latest
-                        target: x86_64-pc-windows-msvc
-        steps:
-            -   uses: actions/checkout@v4
-            -   uses: dtolnay/rust-toolchain@stable
-                with:
-                    targets: ${{ matrix.target }}
-            -   uses: Swatinem/rust-cache@v2
-                with:
-                    key: ${{ matrix.target }}
-            -   name: Build release binary
-                run: cargo build --release --locked -p dbsnap-cli --target ${{ matrix.target }}
-            -   name: Package binary
-                shell: bash
-                run: |
-                    bin=dbsnap
-                    dist="dbsnap-${{ matrix.target }}"
-                    mkdir -p "$dist"
-                    if [ "${{ matrix.os }}" = "windows-latest" ]; then
-                        cp "target/${{ matrix.target }}/release/${bin}.exe" "$dist/"
-                    else
-                        cp "target/${{ matrix.target }}/release/${bin}" "$dist/"
-                    fi
-                    cp README.md "$dist/"
-                    if [ "${{ matrix.os }}" = "windows-latest" ]; then
-                        7z a "${dist}.zip" "$dist" >/dev/null
-                        echo "ASSET=${dist}.zip" >> "$GITHUB_ENV"
-                    else
-                        tar -czf "${dist}.tar.gz" "$dist"
-                        echo "ASSET=${dist}.tar.gz" >> "$GITHUB_ENV"
-                    fi
-            -   name: Upload binary artifact
-                uses: actions/upload-artifact@v4
-                with:
-                    name: dbsnap-${{ matrix.target }}
-                    path: ${{ env.ASSET }}
-                    if-no-files-found: error
-
-    # ----- release (→ GitHub Release with binaries) ----------------------
-    release:
-        name: Release
-        needs: [build]
-        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         runs-on: ubuntu-latest
         permissions:
             contents: write
+            pull-requests: write
         steps:
-            -   uses: actions/download-artifact@v4
+            -   uses: actions/checkout@v4
                 with:
-                    path: dist
-            -   name: Publish GitHub Release
+                    fetch-depth: 0
+                    # A PAT (or GitHub App token) lets the release PR trigger CI;
+                    # falls back to GITHUB_TOKEN otherwise (the release PR then
+                    # won't run CI, due to GitHub's recursion guard).
+                    token: ${{ secrets.RELEASE_PLZ_TOKEN || github.token }}
+            -   uses: dtolnay/rust-toolchain@stable
+            -   name: Run release-plz
+                uses: release-plz/action@v0
+                with:
+                    command: release-plz
                 env:
-                    GH_TOKEN: ${{ github.token }}
-                run: |
-                    gh release create "${{ github.ref_name }}" \
-                        --repo "${{ github.repository }}" \
-                        --title "${{ github.ref_name }}" \
-                        --generate-notes \
-                        dist/*/dbsnap-*.tar.gz dist/*/dbsnap-*.zip
+                    GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || github.token }}
