@@ -327,6 +327,7 @@ dependencies = [
  "dbsnap-integrity",
  "dbsnap-mysql",
  "dbsnap-postgres",
+ "dbsnap-report",
  "serde_json",
  "tokio",
  "tracing",
@@ -420,6 +421,16 @@ dependencies = [
  "serde_json",
  "sqlx",
  "tracing",
+]
+
+[[package]]
+name = "dbsnap-report"
+version = "0.1.0"
+dependencies = [
+ "dbsnap-core",
+ "dbsnap-diff",
+ "dbsnap-integrity",
+ "serde_json",
 ]
 
 [[package]]

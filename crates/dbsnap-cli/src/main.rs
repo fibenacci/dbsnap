@@ -8,7 +8,6 @@
 mod cli;
 mod commands;
 mod context;
-mod datetime;
 mod render;
 mod source;
 
@@ -42,6 +41,7 @@ async fn run() -> Result<()> {
             json,
         } => commands::diff::run(old, new, verbose, json),
         Command::Verify { live, json } => commands::verify::run(live, json).await,
+        Command::Report { old, new, output } => commands::report::run(old, new, output),
         Command::Export {
             commit,
             format,

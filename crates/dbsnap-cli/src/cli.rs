@@ -65,6 +65,16 @@ pub enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Generate a self-contained HTML report (timeline, diff, integrity).
+    Report {
+        /// Old reference for the diff section (default HEAD~1).
+        old: Option<String>,
+        /// New reference for the diff section (default HEAD).
+        new: Option<String>,
+        /// Write to a file instead of stdout.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
     /// Export the database state recorded at a commit.
     Export {
         /// Commit to export (default HEAD).

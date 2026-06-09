@@ -3,6 +3,8 @@ name = "dbsnap-cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+description = "Deterministic database snapshots, diffs and integrity verification (the dbsnap CLI)."
 
 [[bin]]
 name = "dbsnap"
@@ -15,6 +17,7 @@ dbsnap-postgres.workspace = true
 dbsnap-mysql.workspace = true
 dbsnap-diff.workspace = true
 dbsnap-integrity.workspace = true
+dbsnap-report.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 tokio.workspace = true

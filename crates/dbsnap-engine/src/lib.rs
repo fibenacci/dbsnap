@@ -12,10 +12,9 @@
 //! testable with an in-memory fake (see `tests/commit.rs`).
 
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
-use dbsnap_core::{Commit, DbHash, SnapshotSource, TableSnapshot, Tree};
+use dbsnap_core::{now_unix, Commit, DbHash, SnapshotSource, TableSnapshot, Tree};
 use dbsnap_diff::{diff_snapshots, SnapshotDiff};
 use dbsnap_export::{export, Format};
 use dbsnap_integrity::{verify_chain, VerifyReport};
@@ -109,7 +108,7 @@ impl Repository {
             tree: tree_hash,
             parent,
             message,
-            timestamp: now_secs(),
+            timestamp: now_unix(),
             author,
         };
         let hash = self.store.write_commit(&commit)?;
@@ -207,11 +206,4 @@ impl Repository {
         let snaps = self.snapshots_at(reference)?;
         export(&snaps, format, table)
     }
-}
-
-fn now_secs() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
 }

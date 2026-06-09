@@ -23,11 +23,13 @@ mod commit;
 mod schema;
 mod snapshot;
 mod source;
+mod time;
 
 pub use commit::{Commit, Tree, TreeEntry};
 pub use schema::{Column, TableSchema};
 pub use snapshot::{make_record, row_pk, RowRecord, TableSnapshot};
 pub use source::SnapshotSource;
+pub use time::{format_unix_utc, now_unix};
 
 /// Re-exported so downstream crates can name hashes via `dbsnap_core::DbHash`.
 pub use dbsnap_hashing::DbHash;

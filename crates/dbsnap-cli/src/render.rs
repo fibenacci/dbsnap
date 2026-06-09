@@ -1,11 +1,9 @@
 //! Human-facing terminal rendering for commits, diffs and verification reports.
 
-use dbsnap_core::{Commit, DbHash};
+use dbsnap_core::{format_unix_utc, Commit, DbHash};
 use dbsnap_diff::SnapshotDiff;
 use dbsnap_engine::{CommitOutcome, Status};
 use dbsnap_integrity::VerifyReport;
-
-use crate::datetime::format_ts;
 
 const RESET: &str = "\x1b[0m";
 const GREEN: &str = "\x1b[32m";
@@ -50,7 +48,7 @@ pub fn print_history(chain: &[(DbHash, Commit)]) {
 fn print_commit(hash: &DbHash, commit: &Commit) {
     println!("{BOLD}commit {}{RESET}", hash.to_hex());
     println!("  author:  {}", commit.author);
-    println!("  date:    {}", format_ts(commit.timestamp));
+    println!("  date:    {}", format_unix_utc(commit.timestamp));
     println!("  tree:    {}", commit.tree.short());
     if let Some(p) = &commit.parent {
         println!("  parent:  {}", p.short());
@@ -129,8 +127,11 @@ fn compact(v: &serde_json::Value) -> String {
         serde_json::Value::String(s) => s.clone(),
         other => other.to_string(),
     };
-    if s.len() > 60 {
-        format!("{}…", &s[..59])
+    // Truncate by character, not byte, so multi-byte UTF-8 never panics.
+    if s.chars().count() > 60 {
+        let mut t: String = s.chars().take(59).collect();
+        t.push('…');
+        t
     } else {
         s
     }

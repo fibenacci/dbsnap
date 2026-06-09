@@ -1,7 +1,19 @@
-//! Minimal UTC formatting from Unix epoch seconds, without a date dependency.
+//! Minimal UTC time helpers, without a date dependency. Shared by every
+//! front-end (CLI, report, …) so timestamps are produced and rendered
+//! identically.
 
-/// Render a Unix timestamp as a readable UTC string.
-pub fn format_ts(secs: i64) -> String {
+use std::time::{SystemTime, UNIX_EPOCH};
+
+/// Current Unix time in whole seconds (0 if the system clock predates the epoch).
+pub fn now_unix() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+/// Render a Unix timestamp (epoch seconds) as `YYYY-MM-DD HH:MM:SS UTC`.
+pub fn format_unix_utc(secs: i64) -> String {
     if secs <= 0 {
         return "(unknown)".to_string();
     }
@@ -27,20 +39,18 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
     (y, m, d)
 }
 
-// White-box test of the private conversion: stays beside the code, the
-// idiomatic Rust place for testing crate-private helpers.
 #[cfg(test)]
 mod tests {
-    use super::format_ts;
+    use super::format_unix_utc;
 
     #[test]
     fn formats_known_epoch() {
         // 2021-01-01T00:00:00Z
-        assert_eq!(format_ts(1_609_459_200), "2021-01-01 00:00:00 UTC");
+        assert_eq!(format_unix_utc(1_609_459_200), "2021-01-01 00:00:00 UTC");
     }
 
     #[test]
     fn non_positive_is_unknown() {
-        assert_eq!(format_ts(0), "(unknown)");
+        assert_eq!(format_unix_utc(0), "(unknown)");
     }
 }

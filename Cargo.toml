@@ -9,6 +9,7 @@ members = [
     "crates/dbsnap-diff",
     "crates/dbsnap-integrity",
     "crates/dbsnap-export",
+    "crates/dbsnap-report",
     "crates/dbsnap-engine",
     "crates/dbsnap-cli",
 ]
@@ -17,7 +18,7 @@ members = [
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/dbsnap/dbsnap"
+repository = "https://github.com/fibenacci/dbsnap"
 rust-version = "1.82"
 
 [workspace.dependencies]
@@ -51,9 +52,15 @@ dbsnap-storage = { path = "crates/dbsnap-storage" }
 dbsnap-diff = { path = "crates/dbsnap-diff" }
 dbsnap-integrity = { path = "crates/dbsnap-integrity" }
 dbsnap-export = { path = "crates/dbsnap-export" }
+dbsnap-report = { path = "crates/dbsnap-report" }
 dbsnap-engine = { path = "crates/dbsnap-engine" }
 tempfile = "3"
 
 [profile.release]
 lto = "thin"
 codegen-units = 1
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

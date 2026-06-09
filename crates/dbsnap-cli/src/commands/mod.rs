@@ -6,5 +6,6 @@ pub mod diff;
 pub mod export;
 pub mod init;
 pub mod log;
+pub mod report;
 pub mod status;
 pub mod verify;
