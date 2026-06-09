@@ -6,7 +6,8 @@
 //! was tampered with, or a write was corrupted).
 
 use anyhow::Result;
-use dbsnap_hashing::hash_json;
+use dbsnap_core::TreeEntry;
+use dbsnap_hashing::{hash_json, DbHash};
 use dbsnap_storage::Store;
 use serde::Serialize;
 
@@ -51,20 +52,19 @@ pub fn verify_chain(store: &Store) -> Result<VerifyReport> {
     };
 
     let chain = store.chain(&head)?;
-    let mut expected_parent: Option<dbsnap_hashing::DbHash> = None;
+    let mut expected_parent: Option<DbHash> = None;
 
     for (stored_hash, commit) in &chain {
         report.commits_checked += 1;
 
         // 1. Commit hash must match the content (and thus its filename/ref).
-        let recomputed = commit.hash();
-        if recomputed != *stored_hash {
+        if commit.hash() != *stored_hash {
             report.violations.push(Violation::new(
                 "commit-hash-mismatch",
                 format!(
                     "commit {} content hashes to {}",
                     stored_hash.short(),
-                    recomputed.short()
+                    commit.hash().short()
                 ),
             ));
         }
@@ -97,52 +97,59 @@ pub fn verify_chain(store: &Store) -> Result<VerifyReport> {
             ));
         }
 
-        // 4. Each table object: schema hash, table hash, and every row hash.
+        // 4. Every table object: schema hash, table hash, row count, row hashes.
         for entry in &tree.entries {
-            report.tables_checked += 1;
-            let snap = store.read_table_snapshot(&entry.table_hash)?;
-
-            if snap.schema.schema_hash() != entry.schema_hash {
-                report.violations.push(Violation::new(
-                    "schema-hash-mismatch",
-                    format!("table {} schema altered", entry.table),
-                ));
-            }
-            if snap.table_hash() != entry.table_hash {
-                report.violations.push(Violation::new(
-                    "table-hash-mismatch",
-                    format!("table {} data altered", entry.table),
-                ));
-            }
-            if snap.rows.len() as u64 != entry.row_count {
-                report.violations.push(Violation::new(
-                    "row-count-mismatch",
-                    format!(
-                        "table {} expected {} rows, stored {}",
-                        entry.table,
-                        entry.row_count,
-                        snap.rows.len()
-                    ),
-                ));
-            }
-
-            for row in &snap.rows {
-                report.rows_checked += 1;
-                if hash_json(&row.data) != row.hash {
-                    report.violations.push(Violation::new(
-                        "row-hash-mismatch",
-                        format!(
-                            "table {} primary key {} hashes to {} (expected {})",
-                            entry.table,
-                            row.pk,
-                            hash_json(&row.data).short(),
-                            row.hash.short(),
-                        ),
-                    ));
-                }
-            }
+            verify_table(store, entry, &mut report)?;
         }
     }
 
     Ok(report)
+}
+
+/// Verify one table object against the tree entry that references it.
+fn verify_table(store: &Store, entry: &TreeEntry, report: &mut VerifyReport) -> Result<()> {
+    report.tables_checked += 1;
+    let snap = store.read_table_snapshot(&entry.table_hash)?;
+
+    if snap.schema.schema_hash() != entry.schema_hash {
+        report.violations.push(Violation::new(
+            "schema-hash-mismatch",
+            format!("table {} schema altered", entry.table),
+        ));
+    }
+    if snap.table_hash() != entry.table_hash {
+        report.violations.push(Violation::new(
+            "table-hash-mismatch",
+            format!("table {} data altered", entry.table),
+        ));
+    }
+    if snap.rows.len() as u64 != entry.row_count {
+        report.violations.push(Violation::new(
+            "row-count-mismatch",
+            format!(
+                "table {} expected {} rows, stored {}",
+                entry.table,
+                entry.row_count,
+                snap.rows.len()
+            ),
+        ));
+    }
+
+    for row in &snap.rows {
+        report.rows_checked += 1;
+        if hash_json(&row.data) != row.hash {
+            report.violations.push(Violation::new(
+                "row-hash-mismatch",
+                format!(
+                    "table {} primary key {} hashes to {} (expected {})",
+                    entry.table,
+                    row.pk,
+                    hash_json(&row.data).short(),
+                    row.hash.short(),
+                ),
+            ));
+        }
+    }
+
+    Ok(())
 }

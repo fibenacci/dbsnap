@@ -34,7 +34,7 @@ impl MySqlSource {
     }
 
     /// List base tables in the given database (MySQL's "schema"), ordered by name.
-    pub async fn list_tables(&self, schema: &str) -> Result<Vec<String>> {
+    async fn list_tables(&self, schema: &str) -> Result<Vec<String>> {
         // information_schema string columns come back as VARBINARY under some
         // MySQL collations; CAST(... AS CHAR) makes them decode as text.
         let rows = sqlx::query(
@@ -47,14 +47,15 @@ impl MySqlSource {
         .await
         .context("listing tables")?;
 
-        Ok(rows
-            .iter()
-            .map(|r| r.get::<String, _>("table_name"))
-            .collect())
+        let mut tables = Vec::with_capacity(rows.len());
+        for r in &rows {
+            tables.push(r.try_get::<String, _>("table_name")?);
+        }
+        Ok(tables)
     }
 
     /// Introspect a table's columns and primary key.
-    pub async fn table_schema(&self, schema: &str, table: &str) -> Result<TableSchema> {
+    async fn table_schema(&self, schema: &str, table: &str) -> Result<TableSchema> {
         let cols = sqlx::query(
             "SELECT CAST(COLUMN_NAME AS CHAR) AS column_name, CAST(DATA_TYPE AS CHAR) AS data_type, \
                     CAST(IS_NULLABLE AS CHAR) AS is_nullable, CAST(ORDINAL_POSITION AS SIGNED) AS ordinal_position \
@@ -80,26 +81,24 @@ impl MySqlSource {
         .await
         .with_context(|| format!("introspecting primary key of {schema}.{table}"))?;
 
-        let primary_key: Vec<String> = pk_rows
-            .iter()
-            .map(|r| r.get::<String, _>("column_name"))
-            .collect();
+        let mut primary_key = Vec::with_capacity(pk_rows.len());
+        for r in &pk_rows {
+            primary_key.push(r.try_get::<String, _>("column_name")?);
+        }
         let pk_set: HashSet<&str> = primary_key.iter().map(|s| s.as_str()).collect();
 
-        let columns = cols
-            .iter()
-            .map(|r| {
-                let name: String = r.get("column_name");
-                let is_primary_key = pk_set.contains(name.as_str());
-                Column {
-                    data_type: r.get("data_type"),
-                    nullable: r.get::<String, _>("is_nullable") == "YES",
-                    ordinal: r.get::<i64, _>("ordinal_position") as i32,
-                    is_primary_key,
-                    name,
-                }
-            })
-            .collect();
+        let mut columns = Vec::with_capacity(cols.len());
+        for r in &cols {
+            let name: String = r.try_get("column_name")?;
+            let is_primary_key = pk_set.contains(name.as_str());
+            columns.push(Column {
+                data_type: r.try_get("data_type")?,
+                nullable: r.try_get::<String, _>("is_nullable")? == "YES",
+                ordinal: r.try_get::<i64, _>("ordinal_position")? as i32,
+                is_primary_key,
+                name,
+            });
+        }
 
         Ok(TableSchema {
             schema: schema.to_string(),
@@ -110,7 +109,7 @@ impl MySqlSource {
     }
 
     /// Capture every row of one table as a [`TableSnapshot`].
-    pub async fn snapshot_table(&self, schema: &TableSchema) -> Result<TableSnapshot> {
+    async fn snapshot_table(&self, schema: &TableSchema) -> Result<TableSnapshot> {
         // Build `JSON_OBJECT('col', `col`, ...)` over the introspected columns.
         let pairs = schema
             .columns
@@ -156,7 +155,7 @@ impl MySqlSource {
     }
 
     /// Capture the entire database: introspect and snapshot every base table.
-    pub async fn snapshot_all(&self, schema: &str) -> Result<Vec<TableSnapshot>> {
+    async fn snapshot_all(&self, schema: &str) -> Result<Vec<TableSnapshot>> {
         let mut snapshots = Vec::new();
         for table in self.list_tables(schema).await? {
             let ts = self.table_schema(schema, &table).await?;

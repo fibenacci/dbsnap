@@ -30,7 +30,7 @@ impl PgSource {
     }
 
     /// List base tables in the given schema, ordered by name.
-    pub async fn list_tables(&self, schema: &str) -> Result<Vec<String>> {
+    async fn list_tables(&self, schema: &str) -> Result<Vec<String>> {
         let rows = sqlx::query(
             "SELECT table_name FROM information_schema.tables \
              WHERE table_schema = $1 AND table_type = 'BASE TABLE' \
@@ -41,14 +41,15 @@ impl PgSource {
         .await
         .context("listing tables")?;
 
-        Ok(rows
-            .iter()
-            .map(|r| r.get::<String, _>("table_name"))
-            .collect())
+        let mut tables = Vec::with_capacity(rows.len());
+        for r in &rows {
+            tables.push(r.try_get::<String, _>("table_name")?);
+        }
+        Ok(tables)
     }
 
     /// Introspect a table's columns and primary key.
-    pub async fn table_schema(&self, schema: &str, table: &str) -> Result<TableSchema> {
+    async fn table_schema(&self, schema: &str, table: &str) -> Result<TableSchema> {
         let cols = sqlx::query(
             "SELECT column_name, data_type, is_nullable, ordinal_position \
              FROM information_schema.columns \
@@ -74,26 +75,24 @@ impl PgSource {
         .await
         .with_context(|| format!("introspecting primary key of {schema}.{table}"))?;
 
-        let primary_key: Vec<String> = pk_rows
-            .iter()
-            .map(|r| r.get::<String, _>("column_name"))
-            .collect();
+        let mut primary_key = Vec::with_capacity(pk_rows.len());
+        for r in &pk_rows {
+            primary_key.push(r.try_get::<String, _>("column_name")?);
+        }
         let pk_set: HashSet<&str> = primary_key.iter().map(|s| s.as_str()).collect();
 
-        let columns = cols
-            .iter()
-            .map(|r| {
-                let name: String = r.get("column_name");
-                let is_primary_key = pk_set.contains(name.as_str());
-                Column {
-                    data_type: r.get("data_type"),
-                    nullable: r.get::<String, _>("is_nullable") == "YES",
-                    ordinal: r.get::<i32, _>("ordinal_position"),
-                    is_primary_key,
-                    name,
-                }
-            })
-            .collect();
+        let mut columns = Vec::with_capacity(cols.len());
+        for r in &cols {
+            let name: String = r.try_get("column_name")?;
+            let is_primary_key = pk_set.contains(name.as_str());
+            columns.push(Column {
+                data_type: r.try_get("data_type")?,
+                nullable: r.try_get::<String, _>("is_nullable")? == "YES",
+                ordinal: r.try_get::<i32, _>("ordinal_position")?,
+                is_primary_key,
+                name,
+            });
+        }
 
         Ok(TableSchema {
             schema: schema.to_string(),
@@ -104,7 +103,7 @@ impl PgSource {
     }
 
     /// Capture every row of one table as a [`TableSnapshot`].
-    pub async fn snapshot_table(&self, schema: &TableSchema) -> Result<TableSnapshot> {
+    async fn snapshot_table(&self, schema: &TableSchema) -> Result<TableSnapshot> {
         let order_by = if schema.primary_key.is_empty() {
             // Deterministic even without a PK: order by the canonical row text.
             "(to_jsonb(t))::text".to_string()
@@ -143,7 +142,7 @@ impl PgSource {
     }
 
     /// Capture the entire schema: introspect and snapshot every base table.
-    pub async fn snapshot_all(&self, schema: &str) -> Result<Vec<TableSnapshot>> {
+    async fn snapshot_all(&self, schema: &str) -> Result<Vec<TableSnapshot>> {
         let mut snapshots = Vec::new();
         for table in self.list_tables(schema).await? {
             let ts = self.table_schema(schema, &table).await?;

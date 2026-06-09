@@ -8,7 +8,7 @@
 use dbsnap_core::TableSnapshot;
 use serde::Serialize;
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// A single column's change within an updated row.
 #[derive(Debug, Clone, Serialize)]
@@ -93,33 +93,28 @@ pub fn diff_tables(old: &TableSnapshot, new: &TableSnapshot) -> TableDiff {
 }
 
 /// Compute the per-column changes between two row JSON objects.
+///
+/// The union of both objects' keys is collected into a `BTreeSet`, which yields
+/// them unique and sorted in one step.
 fn column_changes(old: &Value, new: &Value) -> Vec<ColumnChange> {
-    let mut changes = Vec::new();
-    let mut keys: Vec<&String> = Vec::new();
-    if let Some(m) = old.as_object() {
-        keys.extend(m.keys());
-    }
-    if let Some(m) = new.as_object() {
-        for k in m.keys() {
-            if !keys.contains(&k) {
-                keys.push(k);
-            }
+    let mut keys: BTreeSet<&str> = BTreeSet::new();
+    for v in [old, new] {
+        if let Some(m) = v.as_object() {
+            keys.extend(m.keys().map(String::as_str));
         }
     }
-    keys.sort();
 
-    for k in keys {
-        let ov = old.get(k).cloned().unwrap_or(Value::Null);
-        let nv = new.get(k).cloned().unwrap_or(Value::Null);
-        if ov != nv {
-            changes.push(ColumnChange {
-                column: k.clone(),
+    keys.into_iter()
+        .filter_map(|k| {
+            let ov = old.get(k).cloned().unwrap_or(Value::Null);
+            let nv = new.get(k).cloned().unwrap_or(Value::Null);
+            (ov != nv).then(|| ColumnChange {
+                column: k.to_string(),
                 old: ov,
                 new: nv,
-            });
-        }
-    }
-    changes
+            })
+        })
+        .collect()
 }
 
 /// Diff two full database snapshots (lists of table snapshots).
