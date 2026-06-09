@@ -16,6 +16,10 @@ from the connection string's URL scheme.
 
 ## Install / build
 
+Tagged releases ship prebuilt `dbsnap` binaries for Linux/macOS/Windows plus a
+shell/PowerShell installer on the [GitHub Releases page](https://github.com/fibenacci/dbsnap/releases)
+(built by cargo-dist). To build from source:
+
 ```bash
 cargo build --release
 # binary at target/release/dbsnap
@@ -72,6 +76,50 @@ flags any mismatch.
 
 Storage is a content-addressed, append-only `.dbsnap/` directory; unchanged
 tables are stored once and shared across commits.
+
+## When to use it
+
+dbsnap has two distinct runtimes with different value. Don't confuse them.
+
+### In CI/CD — measure what a *change* does to a controlled database
+
+You do **not** compare two production databases in CI. You start from a known,
+**ephemeral** database (a fixture, a seed, or a sanitized dump) and measure —
+deterministically — what a change does to it. The "two databases" are two
+points in time of the *same* throwaway DB, or your CI result versus a committed
+golden snapshot.
+
+- **Migration guard** — the headline case. Snapshot before, run the migration,
+  snapshot after, and assert on the diff:
+
+  ```bash
+  dbsnap commit -m "before"
+  bin/console database:migrate          # Doctrine / Flyway / Diesel / …
+  dbsnap commit -m "after"
+  dbsnap diff --json                    # assert: only expected tables changed,
+                                        # e.g. no rows in payment_transaction
+  ```
+
+  Catches migrations with unintended data side-effects (a backfill that corrupts
+  rows, an accidental column rewrite).
+
+- **Schema-drift check** — compare the schema hashes a branch's migrations
+  produce against a committed baseline; fail if the schema drifted unexpectedly.
+- **Reproducibility** — run the migration chain twice (or `up → down → up`) and
+  assert the state hash is identical; catches non-deterministic migrations.
+- **Golden-snapshot tests** — like Jest snapshots, but for database state: seed
+  a known input, run an import / ETL job / plugin install, and diff the result
+  against a committed golden snapshot.
+
+### In operations / incident response — integrity over time on a *real* database
+
+- `dbsnap verify --live` detects out-of-band mutations of the live database
+  versus a recorded snapshot (tamper / unauthorized-change detection).
+- `dbsnap export` / replay reconstructs historical state for incident analysis.
+
+These run against staging/production over time — **not** in CI. Plain
+`dbsnap verify` (stored-chain integrity) is weak as a CI gate; the real CI value
+is the **diff / migration-guard** pattern above.
 
 ## Workspace layout
 
